@@ -71,7 +71,7 @@ Add to `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/wiedymi/Umami.git", from: "0.1.0")
+    .package(url: "https://github.com/wiedymi/swift-umami.git", from: "0.1.0")
 ]
 ```
 
