@@ -81,7 +81,7 @@ Then add the library target:
 .target(
     name: "YourApp",
     dependencies: [
-        .product(name: "Umami", package: "Umami")
+        .product(name: "Umami", package: "swift-umami")
     ]
 )
 ```
