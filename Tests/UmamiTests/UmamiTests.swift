@@ -55,6 +55,32 @@ final class UmamiTests: XCTestCase {
         XCTAssertEqual(json["shareId"] as? String, "share123")
     }
 
+    func testCloudConfigurationRoutesThroughV1AndInjectsAPIKey() async throws {
+        let recorder = RequestRecorder()
+        let executor = UmamiHTTPExecutor { request in
+            await recorder.append(request)
+            return Self.response(
+                statusCode: 200,
+                body: #"{"data":[],"count":0,"page":1,"pageSize":20}"#
+            )
+        }
+        let client = UmamiAPIClient(
+            configuration: .init(
+                baseURL: URL(string: "https://api.umami.is")!,
+                apiPath: "/v1",
+                executor: executor
+            ),
+            auth: .apiKey("cloud-key")
+        )
+
+        _ = try await client.websites.list()
+
+        let request = await recorder.request(at: 0)
+        XCTAssertEqual(request.url?.absoluteString, "https://api.umami.is/v1/websites")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-umami-api-key"), "cloud-key")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+    }
+
     func testAPIErrorEnvelopeIsMapped() async throws {
         let configuration = makeConfiguration { _ in
             Self.response(

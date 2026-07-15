@@ -29,7 +29,8 @@ public struct DefaultUmamiTransport: UmamiTransport, Sendable {
     }
 
     private func makeURLRequest<Response>(from request: UmamiRequest<Response>) throws -> URLRequest {
-        guard let url = URL(string: request.path, relativeTo: configuration.baseURL) else {
+        let path = resolvedPath(request.path)
+        guard let url = URL(string: path, relativeTo: configuration.baseURL) else {
             throw UmamiTransportError.invalidURL(request.path)
         }
 
@@ -70,5 +71,14 @@ public struct DefaultUmamiTransport: UmamiTransport, Sendable {
         }
 
         return urlRequest
+    }
+
+    private func resolvedPath(_ path: String) -> String {
+        guard configuration.apiPath != "/api" else { return path }
+        if path == "/api" { return configuration.apiPath }
+        if path.hasPrefix("/api/") {
+            return configuration.apiPath + path.dropFirst(4)
+        }
+        return path
     }
 }

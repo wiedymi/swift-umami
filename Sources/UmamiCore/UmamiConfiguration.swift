@@ -2,6 +2,7 @@ import Foundation
 
 public struct UmamiConfiguration: Sendable {
     public var baseURL: URL
+    public var apiPath: String
     public var userAgent: String?
     public var executor: UmamiHTTPExecutor
     public var decoderFactory: @Sendable () -> JSONDecoder
@@ -9,12 +10,15 @@ public struct UmamiConfiguration: Sendable {
 
     public init(
         baseURL: URL,
+        apiPath: String = "/api",
         userAgent: String? = nil,
         executor: UmamiHTTPExecutor = .urlSession(.shared),
         decoderFactory: @escaping @Sendable () -> JSONDecoder = { JSONDecoder.umamiDefault() },
         encoderFactory: @escaping @Sendable () -> JSONEncoder = { JSONEncoder.umamiDefault() }
     ) {
         self.baseURL = baseURL
+        let trimmedPath = apiPath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        self.apiPath = trimmedPath.isEmpty ? "" : "/\(trimmedPath)"
         self.userAgent = userAgent
         self.executor = executor
         self.decoderFactory = decoderFactory
