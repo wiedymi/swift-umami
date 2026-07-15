@@ -4,6 +4,16 @@ import UmamiCore
 public struct AnalyticsAPI: Sendable {
     let context: UmamiAPIContext
 
+    public func activeVisitors(websiteId: String) async throws -> UmamiActiveVisitorsResponse {
+        try await context.transport.send(
+            .json(
+                method: "GET",
+                path: "/api/websites/\(websiteId)/active",
+                auth: context.auth
+            )
+        )
+    }
+
     public func realtime(websiteId: String, query: UmamiAnalyticsQuery = .init()) async throws -> UmamiRealtimeResponse {
         try await context.transport.send(
             .json(
@@ -64,6 +74,17 @@ public struct AnalyticsAPI: Sendable {
             .json(
                 method: "GET",
                 path: "/api/websites/\(websiteId)/events",
+                auth: context.auth,
+                queryItems: query.queryItems()
+            )
+        )
+    }
+
+    public func eventStats(websiteId: String, query: UmamiAnalyticsQuery = .init()) async throws -> UmamiEventStatsResponse {
+        try await context.transport.send(
+            .json(
+                method: "GET",
+                path: "/api/websites/\(websiteId)/events/stats",
                 auth: context.auth,
                 queryItems: query.queryItems()
             )

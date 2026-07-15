@@ -192,7 +192,18 @@ public enum UmamiQueryItems {
 
     public static func appendMilliseconds(_ items: inout [URLQueryItem], name: String, value: Date?) {
         guard let value else { return }
-        items.append(URLQueryItem(name: name, value: String(Int64(value.timeIntervalSince1970 * 1000.0))))
+        let milliseconds = value.timeIntervalSince1970 * 1_000
+        let timestamp: Int64
+        if !milliseconds.isFinite {
+            return
+        } else if milliseconds >= Double(Int64.max) {
+            timestamp = .max
+        } else if milliseconds <= Double(Int64.min) {
+            timestamp = .min
+        } else {
+            timestamp = Int64(milliseconds)
+        }
+        items.append(URLQueryItem(name: name, value: String(timestamp)))
     }
 
     public static func appendISO8601(_ items: inout [URLQueryItem], name: String, value: Date?) {

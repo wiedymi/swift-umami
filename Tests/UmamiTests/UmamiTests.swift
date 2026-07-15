@@ -153,7 +153,7 @@ final class UmamiTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any?])
         XCTAssertTrue(json.keys.contains("shareId"))
-        XCTAssertNil(json["shareId"] ?? "not-nil")
+        XCTAssertTrue((json["shareId"] ?? nil) is NSNull)
     }
 
     func testStatsResponseDecodesComparison() async throws {
@@ -185,6 +185,131 @@ final class UmamiTests: XCTestCase {
         XCTAssertEqual(response.pageviews, 10)
         XCTAssertEqual(response.comparison?.pageviews, 8)
         XCTAssertEqual(response.summary.visitors, 5)
+    }
+
+    func testActiveVisitorsAndEventStatsUseTypedAnalyticsRoutes() async throws {
+        let recorder = RequestRecorder()
+        let configuration = makeConfiguration(recorder: recorder) { request in
+            switch request.url?.path {
+            case "/api/websites/website-1/active":
+                return Self.response(statusCode: 200, body: #"{"visitors":5}"#)
+            case "/api/websites/website-1/events/stats":
+                return Self.response(
+                    statusCode: 200,
+                    body: #"{"data":{"events":12,"visitors":8,"visits":9,"uniqueEvents":3,"comparison":{"events":10,"visitors":7,"visits":8,"uniqueEvents":2}}}"#
+                )
+            default:
+                return Self.response(statusCode: 404, body: "{}")
+            }
+        }
+        let client = UmamiAPIClient(configuration: configuration, auth: .bearerToken("token"))
+
+        let active = try await client.analytics.activeVisitors(websiteId: "website-1")
+        let stats = try await client.analytics.eventStats(
+            websiteId: "website-1",
+            query: .init(range: .init(startAt: Date(timeIntervalSince1970: 1)))
+        )
+
+        XCTAssertEqual(active.visitors, 5)
+        XCTAssertEqual(stats.data.events, 12)
+        XCTAssertEqual(stats.data.comparison?.uniqueEvents, 2)
+        let activeRequest = await recorder.request(at: 0)
+        XCTAssertEqual(activeRequest.url?.path, "/api/websites/website-1/active")
+        let statsRequest = await recorder.request(at: 1)
+        XCTAssertEqual(statsRequest.url?.path, "/api/websites/website-1/events/stats")
+        XCTAssertTrue(statsRequest.url?.query?.contains("startAt=1000") == true)
+    }
+
+    func testReportsListAndRunOwnRoutesAndPayloads() async throws {
+        struct GoalResponse: Decodable, Sendable {
+            let num: Int
+            let total: Int
+        }
+
+        let recorder = RequestRecorder()
+        let configuration = makeConfiguration(recorder: recorder) { request in
+            switch (request.httpMethod, request.url?.path) {
+            case ("GET", "/api/reports"):
+                return Self.response(
+                    statusCode: 200,
+                    body: #"{"data":[{"id":"report-1","websiteId":"website-1","type":"goal","name":"Signup","parameters":{"type":"event","value":"signup"}}],"count":1,"page":2,"pageSize":20}"#
+                )
+            case ("POST", "/api/reports/goal"):
+                return Self.response(statusCode: 200, body: #"{"num":4,"total":20}"#)
+            default:
+                return Self.response(statusCode: 404, body: "{}")
+            }
+        }
+        let client = UmamiAPIClient(configuration: configuration, auth: .bearerToken("token"))
+
+        let reports = try await client.reports.list(
+            .init(
+                websiteId: "website-1",
+                type: "goal",
+                pagination: .init(page: 2, pageSize: 20)
+            )
+        )
+        let goal = try await client.reports.run(
+            "goal",
+            request: .init(
+                websiteId: "website-1",
+                type: "goal",
+                parameters: [
+                    "type": JSONValue.string("event"),
+                    "value": JSONValue.string("signup"),
+                ]
+            ),
+            as: GoalResponse.self
+        )
+
+        XCTAssertEqual(reports.data.first?.id, "report-1")
+        XCTAssertEqual(
+            try XCTUnwrap(reports.data.first?.parameters?["value"]),
+            JSONValue.string("signup")
+        )
+        XCTAssertEqual(goal.num, 4)
+        XCTAssertEqual(goal.total, 20)
+
+        let listRequest = await recorder.request(at: 0)
+        let listComponents = try XCTUnwrap(
+            URLComponents(url: try XCTUnwrap(listRequest.url), resolvingAgainstBaseURL: false)
+        )
+        let query = Dictionary(
+            uniqueKeysWithValues: (listComponents.queryItems ?? []).map { ($0.name, $0.value ?? "") }
+        )
+        XCTAssertEqual(query["websiteId"], "website-1")
+        XCTAssertEqual(query["type"], "goal")
+        XCTAssertEqual(query["page"], "2")
+        XCTAssertEqual(query["pageSize"], "20")
+
+        let runRequest = await recorder.request(at: 1)
+        XCTAssertEqual(runRequest.url?.path, "/api/reports/goal")
+        let body = try XCTUnwrap(runRequest.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(json["websiteId"] as? String, "website-1")
+        XCTAssertEqual(json["type"] as? String, "goal")
+    }
+
+    func testDateQueryClampsExtremeMillisecondsWithoutOverflowing() async throws {
+        let recorder = RequestRecorder()
+        let configuration = makeConfiguration(recorder: recorder) { _ in
+            Self.response(
+                statusCode: 200,
+                body: #"{"pageviews":0,"visitors":0,"visits":0,"bounces":0,"totaltime":0}"#
+            )
+        }
+        let client = UmamiAPIClient(configuration: configuration)
+
+        _ = try await client.analytics.stats(
+            websiteId: "website-1",
+            query: .init(range: .init(startAt: .distantFuture, endAt: .distantPast))
+        )
+
+        let request = await recorder.request(at: 0)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let query = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        XCTAssertNotNil(Int64(query["startAt"] ?? ""))
+        XCTAssertNotNil(Int64(query["endAt"] ?? ""))
     }
 
     func testTrackerReusesCacheTokenAcrossRequests() async throws {

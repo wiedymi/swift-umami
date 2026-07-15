@@ -26,6 +26,7 @@ public struct UmamiAPIClient: Sendable {
     public var account: AccountAPI { AccountAPI(context: context) }
     public var websites: WebsitesAPI { WebsitesAPI(context: context) }
     public var analytics: AnalyticsAPI { AnalyticsAPI(context: context) }
+    public var reports: ReportsAPI { ReportsAPI(context: context) }
     public var raw: RawAPI { RawAPI(context: context) }
 }
 

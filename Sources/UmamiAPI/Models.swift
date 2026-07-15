@@ -200,6 +200,58 @@ public struct UmamiWebsiteStatsResponse: Sendable, Codable {
     }
 }
 
+public struct UmamiActiveVisitorsResponse: Sendable, Codable {
+    public let visitors: Int
+
+    public init(visitors: Int) {
+        self.visitors = visitors
+    }
+}
+
+public struct UmamiEventStatsResponse: Sendable, Codable {
+    public let data: UmamiEventStats
+
+    public init(data: UmamiEventStats) {
+        self.data = data
+    }
+}
+
+public struct UmamiEventStats: Sendable, Codable {
+    public let events: Int
+    public let visitors: Int
+    public let visits: Int
+    public let uniqueEvents: Int
+    public let comparison: UmamiEventStatsComparison?
+
+    public init(
+        events: Int,
+        visitors: Int,
+        visits: Int,
+        uniqueEvents: Int,
+        comparison: UmamiEventStatsComparison? = nil
+    ) {
+        self.events = events
+        self.visitors = visitors
+        self.visits = visits
+        self.uniqueEvents = uniqueEvents
+        self.comparison = comparison
+    }
+}
+
+public struct UmamiEventStatsComparison: Sendable, Codable {
+    public let events: Int
+    public let visitors: Int
+    public let visits: Int
+    public let uniqueEvents: Int
+
+    public init(events: Int, visitors: Int, visits: Int, uniqueEvents: Int) {
+        self.events = events
+        self.visitors = visitors
+        self.visits = visits
+        self.uniqueEvents = uniqueEvents
+    }
+}
+
 public struct UmamiMetricPoint: Sendable, Codable {
     public let x: String
     public let y: Int
